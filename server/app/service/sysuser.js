@@ -1,7 +1,7 @@
 'use strict';
 
 const Service = require('egg').Service;
-
+const Op = require('sequelize').Op;
 class SysUserService extends Service {
   async list(query) {
     if (Object.keys(query).length) {
@@ -48,21 +48,21 @@ class SysUserService extends Service {
 
   async create(params) {
     const { loginName, email, phonenumber, password, roleIds, ...rest } = params;
-    const exitLoingName = await this.ctx.model.SysUser.findOne({ where: { loginName } });
-    if (exitLoingName) {
-      return { code: 500, msg: '用户名已存在' };
-    }
-    const exitEmail = await this.ctx.model.SysUser.findOne({ where: { email } });
-    if (exitEmail) {
-      return { code: 500, msg: '邮箱已存在' };
-    }
-    const exitPhonenumber = await this.ctx.model.SysUser.findOne({ where: { phonenumber } });
-    if (exitPhonenumber) {
-      return { code: 500, msg: '用户号码已存在' };
+    const exitUser = await this.ctx.model.SysUser.findOne({ where: { [Op.or]: [{ loginName }, { email }, { phonenumber }] } });
+    if (exitUser) {
+      if (loginName === exitUser.loginName) {
+        return { code: 500, msg: '用户名已存在' };
+      }
+      if (email === exitUser.email) {
+        return { code: 500, msg: '邮箱已存在' };
+      }
+      if (phonenumber === exitUser.phonenumber) {
+        return { code: 500, msg: '用户号码已存在' };
+      }
     }
     const user = await this.ctx.service.redis.get('user');
     const scretpassword = this.ctx.helper.getMd5Data(password);
-    const newUser = await this.ctx.model.SysUser.create({ ...rest, loginName, email, phonenumber, password: scretpassword, createBy: user.loginName, updateBy: user.loginName });
+    const newUser = await this.ctx.model.SysUser.create({ ...rest, loginName, email, phonenumber, password: scretpassword, createBy: user.loginName });
     const insetArr = [];
     roleIds.forEach(id => {
       insetArr.push({
@@ -74,13 +74,38 @@ class SysUserService extends Service {
     return { code: 200, msg: '添加成功' };
   }
   async modify(params) {
-    const { userId, roleIds, ...rest } = params;
+    const { loginName, email, phonenumber, userId, roleIds, userName, sex, status, remark } = params;
     if (userId === 1) {
       return { code: 500, msg: '不允许操作超级管理员' };
     }
-    const user = await this.ctx.model.SysUser.findByPk(userId);
+    const user = await this.ctx.model.SysUser.findOne({
+      where: { userId: { [Op.eq]: userId } }, include: [{
+        model: this.ctx.model.SysRole,
+        as: 'roles',
+        through: {
+          attributes: [],
+        },
+      }],
+    });
     if (!user) {
       return { code: 500, msg: '此用户不存在' };
+    }
+    const loginUserDataScore = await this.ctx.getMaxDataScore();
+    const userDataScore = this.ctx.compareDataScore(user.roles);
+    if (loginUserDataScore <= userDataScore) {
+      return { code: 500, msg: '权值过低，请联系管理员' };
+    }
+    const exitUser = await this.ctx.model.SysUser.findOne({ where: { [Op.or]: [{ loginName }, { email }, { phonenumber }], userId: { [Op.ne]: userId } } });
+    if (exitUser) {
+      if (loginName === exitUser.loginName) {
+        return { code: 500, msg: '用户名已存在' };
+      }
+      if (email === exitUser.email) {
+        return { code: 500, msg: '邮箱已存在' };
+      }
+      if (phonenumber === exitUser.phonenumber) {
+        return { code: 500, msg: '用户号码已存在' };
+      }
     }
     const insetArr = [];
     roleIds.forEach(id => {
@@ -89,22 +114,79 @@ class SysUserService extends Service {
         roleId: id,
       });
     });
-    if (insetArr.length) {
-      await this.ctx.model.SysUserRole.destroy({ where: { userId } });
-      await this.ctx.model.SysUserRole.bulkCreate(insetArr, { updateOnDuplicate: [ 'userId', 'roleId' ] });
-    }
-    await user.update(rest);
+    await this.ctx.model.SysUserRole.destroy({ where: { userId } });
+    await this.ctx.model.SysUserRole.bulkCreate(insetArr, { updateOnDuplicate: [ 'userId', 'roleId' ] });
+    const loginUser = await this.ctx.service.redis.get('user');
+    await user.update({ userName, sex, status, remark, updateBy: loginUser.loginName });
     return { code: 200, msg: '修改成功' };
   }
+
+
+  async changeStatus(params) {
+    const { userId, status } = params;
+    if (userId === 1) {
+      return { code: 500, msg: '不允许操作超级管理员' };
+    }
+    const user = await this.ctx.model.SysUser.findOne({
+      where: { userId: { [Op.eq]: userId } }, include: [{
+        model: this.ctx.model.SysRole,
+        as: 'roles',
+        through: {
+          attributes: [],
+        },
+      }],
+    });
+    if (!user) {
+      return { code: 500, msg: '此角色不存在' };
+    }
+    const loginUserDataScore = await this.ctx.getMaxDataScore();
+    const userDataScore = this.ctx.compareDataScore(user.roles);
+    if (loginUserDataScore <= userDataScore) {
+      return { code: 500, msg: '权值过低，请联系管理员' };
+    }
+    const loginUser = await this.ctx.service.redis.get('user');
+    await user.update({ status, updateBy: loginUser.loginName });
+    return { code: 200, msg: '修改成功' };
+  }
+
+  async resetPwd(params) {
+    const { getMd5Data } = this.ctx.helper;
+    const { userId, password } = params;
+    const user = await this.ctx.model.SysUser.findByPk(userId);
+    if (!user) {
+      return { code: 500, msg: '此角色不存在' };
+    }
+    const loginUser = await this.ctx.service.redis.get('user');
+    if (loginUser.userId !== 1) {
+      return { code: 500, msg: '你不是超级管理员，没有权限' };
+    }
+    await user.update({ password: getMd5Data(password), updateBy: loginUser.loginName });
+    return { code: 200, msg: '重置密码成功' };
+  }
+
   async destroy(id) {
-    const user = await this.ctx.model.SysUser.findByPk(id);
+    const loginUser = await this.ctx.service.redis.get('user');
+    const user = await this.ctx.model.SysUser.findOne({
+      where: { userId: { [Op.eq]: id } }, include: [{
+        model: this.ctx.model.SysRole,
+        as: 'roles',
+        through: {
+          attributes: [],
+        },
+      }],
+    });
     if (!user) {
       return { code: 500, msg: '此用户不存在' };
     }
     if (id === 1) {
       return { code: 500, msg: '不允许操作超级管理员' };
     }
-    await user.update({ delFlag: 2 });
+    const loginUserDataScore = await this.ctx.getMaxDataScore();
+    const userDataScore = this.ctx.compareDataScore(user.roles);
+    if (loginUserDataScore <= userDataScore) {
+      return { code: 500, msg: '权值过低，请联系管理员' };
+    }
+    await user.update({ delFlag: 2, updateBy: loginUser.loginName });
     return { code: 200, msg: '删除成功' };
   }
 }

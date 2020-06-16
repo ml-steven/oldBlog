@@ -1,6 +1,7 @@
 'use strict';
 
 const Service = require('egg').Service;
+const Op = require('sequelize').Op;
 class MenuService extends Service {
   async list(query) {
     const { redis } = this.ctx.service;
@@ -28,6 +29,35 @@ class MenuService extends Service {
     });
     return menus;
   }
+  async roleList(roleId) {
+    const menus = await this.list({});
+    const menuList = this.ctx.helper.handleRoleMenus(menus);
+
+    const childMenus = this.ctx.helper.getDepChildKey(menuList);
+    console.log('+++', menuList);
+    if (!roleId) {
+      return {
+        code: 200,
+        msg: '操作成功',
+        data: menuList,
+      };
+    }
+    const checkedKeys = [];
+    const checkMenus = await this.ctx.model.SysRoleMenu.findAll({ where: { roleId } });
+    for (let i = 0; i < checkMenus.length; i++) {
+      for (let j = 0; j < childMenus.length; j++) {
+        if (checkMenus[i].menuId === childMenus[j].id) {
+          checkedKeys.push(checkMenus[i].menuId);
+        }
+      }
+    }
+    return {
+      code: 200,
+      menus: menuList,
+      checkedKeys,
+    };
+  }
+
   async getRouters() {
     const user = await this.ctx.service.redis.get('user');
     if (!user) {
@@ -45,9 +75,12 @@ class MenuService extends Service {
       const result = this.ctx.helper.handleRouters(menus, 0);
       return result;
     }
+    // if(user.)
     const roleIds = [];
     user.roles.forEach(item => {
-      roleIds.push(item.roleId);
+      if (item.status === '0') {
+        roleIds.push(item.roleId);
+      }
     });
     const list = await this.ctx.model.SysRoleMenu.findAll({ where: { roleId: roleIds } });
     list.forEach(function(item) {
@@ -81,14 +114,20 @@ class MenuService extends Service {
     return menu;
   }
   async modify(params) {
-    const { menuId, ...rest } = params;
+    const { menuName, parentId, menuId, ...rest } = params;
     const menu = await this.ctx.model.SysMenu.findByPk(menuId);
     if (!menu) {
-      return 404;
+      return { code: 500, msg: '该菜单不存在' };
+    }
+    const exitMenu = await this.ctx.model.SysMenu.findOne({ where: { [Op.and]: [{ menuName }, { parentId }], menuId: { [Op.ne]: menuId } } });
+    if (exitMenu) {
+      if (exitMenu.menuName === menuName) {
+        return { code: 500, msg: '该级下的菜单名称已存在' };
+      }
     }
     const user = await this.ctx.service.redis.get('user');
-    await menu.update({ ...rest, updateBy: user.loginName });
-    return menu;
+    await menu.update({ ...rest, menuName, parentId, updateBy: user.loginName });
+    return { code: 200, msg: '修改成功' };
   }
   async destroy(id) {
     const menu = await this.ctx.model.SysMenu.findByPk(id);

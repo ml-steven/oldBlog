@@ -17,11 +17,28 @@ class UserController extends Controller {
     const ctx = this.ctx;
     const user = await this.ctx.service.redis.get('user');
     if (user) {
+      let permissions = [];
+      const roles = [];
+      for (let i = 0; i < user.roles.length; i++) {
+        roles.push(user.roles[0].roleKey);
+      }
+      if (user.userId !== 1) {
+        const menus = await ctx.service.menu.list({});
+        for (let i = 0; i < menus.length; i++) {
+          if (menus[i].perms) {
+            permissions.push(menus[i].perms);
+          }
+        }
+        user.isAdmin = false;
+      } else {
+        user.isAdmin = true;
+        permissions = [ '*:*:*' ];
+      }
       ctx.status = 200;
       ctx.body = {
         code: 200,
-        permissions: [ '*:*:*' ],
-        roles: [ user.roles[0].role_key ],
+        permissions,
+        roles,
         user,
       };
     } else {

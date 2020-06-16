@@ -232,6 +232,7 @@
                   :key="item.roleId"
                   :label="item.roleName"
                   :value="item.roleId"
+                  :disabled="item.dataScore>=maxDataScore"
                 ></el-option>
               </el-select>
             </el-form-item>
@@ -285,6 +286,7 @@
 <script>
 import { listUser, getUser, delUser, addUser, updateUser, exportUser, resetUserPwd, changeUserStatus, importTemplate } from "@/api/system/user";
 import { getToken } from "@/utils/auth";
+import {mapGetters} from "vuex";
 
 export default {
   name: "User",
@@ -374,6 +376,9 @@ export default {
         ]
       }
     };
+  },
+  computed:{
+    ...mapGetters(['maxDataScore'])
   },
   created() {
     this.getList();

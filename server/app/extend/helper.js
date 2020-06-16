@@ -133,4 +133,51 @@ module.exports = {
     });
     return routes;
   },
+  /**
+ * @fun {Function} handleRoleMenus 生成权限菜单树结构
+ * @param {Array} menus 菜单列表
+ * @returns {Array} 返回权限菜单树结构
+ */
+
+  handleRoleMenus(menus, parentId) {
+    const menuList = [];
+    parentId = parentId || 0;
+    menus.filter(menu => {
+      if (menu.parentId === parentId) {
+        const children = this.handleRoleMenus(menus, menu.menuId) || [];
+        const menuItem = {
+          id: menu.menuId,
+          label: menu.menuName,
+        };
+        if (children.length > 0) {
+          menuItem.children = children;
+        }
+        menuList.push(menuItem);
+        return true;
+      }
+      return false;
+    });
+    return menuList;
+  },
+  /**
+ * @fun {Function} getDepChildKey 获取最里层child列表key
+ * @param {Array} menus 含children菜单列表
+ * @returns {Array} 返回child列表key
+ */
+
+  getDepChildKey(menus) {
+    const childMenus = [];
+    function test(menus) {
+      menus.filter(menu => {
+        if (!menu.children) {
+          childMenus.push(menu);
+        } else {
+          test(menu.children);
+        }
+        return true;
+      });
+    }
+    test(menus);
+    return childMenus;
+  },
 };

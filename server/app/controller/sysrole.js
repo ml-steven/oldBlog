@@ -2,9 +2,9 @@
 
 const Controller = require('egg').Controller;
 /**
-* @controller SysRole 角色接口
+* @controller sysrole 角色接口
 */
-class SysRoleController extends Controller {
+class sysRoleController extends Controller {
   /**
 * @Summary 系统角色列表
 * @description 查询系统角色列表接口
@@ -14,7 +14,7 @@ class SysRoleController extends Controller {
 
   async list() {
     const ctx = this.ctx;
-    const list = await ctx.service.SysRole.list(ctx.query);
+    const list = await ctx.service.sysrole.list(ctx.query);
     ctx.status = 200;
     ctx.body = {
       code: 200,
@@ -33,7 +33,7 @@ class SysRoleController extends Controller {
   async show() {
     const ctx = this.ctx;
     const { id } = ctx.params;
-    const result = await ctx.service.SysRole.show(id);
+    const result = await ctx.service.sysrole.show(id);
     ctx.status = 200;
     ctx.body = {
       code: 200,
@@ -50,7 +50,7 @@ class SysRoleController extends Controller {
 
   async create() {
     const ctx = this.ctx;
-    const result = await ctx.service.SysRole.create(ctx.request.body);
+    const result = await ctx.service.sysrole.create(ctx.request.body);
     ctx.status = 200;
     ctx.body = {
       ...result,
@@ -66,7 +66,23 @@ class SysRoleController extends Controller {
 
   async modify() {
     const ctx = this.ctx;
-    const result = await ctx.service.SysRole.modify(ctx.request.body);
+    const result = await ctx.service.sysrole.modify(ctx.request.body);
+    ctx.status = 200;
+    ctx.body = {
+      ...result,
+    };
+  }
+
+  /**
+* @Summary 修改角色状态
+* @description 修改系统角色状态
+* @Router put /system/role/changeStatus
+* @response 200  返回结果
+*/
+
+  async changeStatus() {
+    const ctx = this.ctx;
+    const result = await ctx.service.sysrole.changeStatus(ctx.request.body);
     ctx.status = 200;
     ctx.body = {
       ...result,
@@ -82,7 +98,7 @@ class SysRoleController extends Controller {
 
   async destroy() {
     const ctx = this.ctx;
-    const result = await ctx.service.SysRole.destroy(ctx.params.id);
+    const result = await ctx.service.sysrole.destroy(ctx.params.id);
     ctx.status = 200;
     ctx.body = {
       ...result,
@@ -90,4 +106,4 @@ class SysRoleController extends Controller {
   }
 }
 
-module.exports = SysRoleController;
+module.exports = sysRoleController;

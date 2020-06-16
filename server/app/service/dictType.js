@@ -28,7 +28,7 @@ class DictTypeService extends Service {
   async create(params) {
     const { dictType, ...rest } = params;
     const result = await this.ctx.model.SysDictType.findOrCreate({
-      where: { dictType },
+      where: { dictType: dictType.trim() },
     });
     if (result[1]) {
       await result[0].update(rest);
@@ -37,13 +37,17 @@ class DictTypeService extends Service {
   }
 
   async modify(params) {
-    const { dictId, ...rest } = params;
+    const { dictId, dictType, ...rest } = params;
     const dict = await this.ctx.model.SysDictType.findByPk(dictId);
     if (!dict) {
-      return 404;
+      return { code: 500, msg: '该字典不存在' };
     }
-    await dict.update(rest);
-    return dict;
+    const exitDictType = await this.ctx.model.SysDictType.findOne({ where: { dictType, dictId: { [Op.ne]: dictId } } });
+    if (exitDictType) {
+      return { code: 500, msg: '字典类型已存在' };
+    }
+    await dict.update({ dictType, ...rest });
+    return { code: 200, msg: '修改成功' };
   }
 
   async destroy(id) {

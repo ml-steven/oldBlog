@@ -74,15 +74,10 @@ class DictTypeController extends Controller {
 
   async modify() {
     const ctx = this.ctx;
-    const data = await ctx.service.dictType.modify(ctx.request.body);
-    if (data === 404) {
-      ctx.status = 404;
-      return;
-    }
+    const result = await ctx.service.dictType.modify(ctx.request.body);
     ctx.status = 200;
     ctx.body = {
-      code: 200,
-      msg: '修改成功',
+      ...result,
     };
   }
   /**

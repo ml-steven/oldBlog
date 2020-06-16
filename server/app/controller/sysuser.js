@@ -74,6 +74,38 @@ class SysUserController extends Controller {
   }
 
   /**
+  * @Summary 重置系统用户密码
+  * @description 重置系统用户密码
+  * @Router put /system/user/resetPwd
+  * @response 200  返回结果
+  */
+
+  async resetPwd() {
+    const ctx = this.ctx;
+    const result = await ctx.service.sysuser.resetPwd(ctx.request.body);
+    ctx.status = 200;
+    ctx.body = {
+      ...result,
+    };
+  }
+
+  /**
+  * @Summary 修改系统用户状态
+  * @description 修改系统用户状态
+  * @Router put /system/user/changeStatus
+  * @response 200  返回结果
+  */
+
+  async changeStatus() {
+    const ctx = this.ctx;
+    const result = await ctx.service.sysuser.changeStatus(ctx.request.body);
+    ctx.status = 200;
+    ctx.body = {
+      ...result,
+    };
+  }
+
+  /**
   * @Summary 删除系统用户
   * @description 根据id删除系统用户信息
   * @Router delete /system/user/:id

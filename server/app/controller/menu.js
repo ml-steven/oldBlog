@@ -21,6 +21,37 @@ class MenuController extends Controller {
       data: list ? list : '请先登录',
     };
   }
+  /**
+* @Summary 权限菜单列表
+* @description 查询权限菜单列表接口
+* @Router GET /system/menu/roleMenuTreeselect/:id
+* @response 200  返回结果
+*/
+
+  async roleMenuTreeselect() {
+    const ctx = this.ctx;
+    const result = await ctx.service.menu.roleList(ctx.params.id);
+    ctx.status = 200;
+    ctx.body = {
+      ...result,
+    };
+  }
+
+  /**
+* @Summary 菜单列表
+* @description 查询菜单列表接口
+* @Router GET /system/menu/treeselect
+* @response 200  返回结果
+*/
+
+  async treeselect() {
+    const ctx = this.ctx;
+    const result = await ctx.service.menu.roleList();
+    ctx.status = 200;
+    ctx.body = {
+      ...result,
+    };
+  }
 
   /**
 * @Summary 菜单列表
@@ -98,15 +129,10 @@ class MenuController extends Controller {
 
   async modify() {
     const ctx = this.ctx;
-    const data = await ctx.service.menu.modify(ctx.request.body);
-    if (data === 404) {
-      ctx.status = 404;
-      return;
-    }
+    const result = await ctx.service.menu.modify(ctx.request.body);
     ctx.status = 200;
     ctx.body = {
-      code: 200,
-      msg: '修改成功',
+      ...result,
     };
   }
   /**

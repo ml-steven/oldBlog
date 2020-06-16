@@ -22,7 +22,13 @@
       </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button type="primary" icon="el-icon-plus" size="mini" @click="handleAdd" v-hasPermi="['system:menu:add']">新增</el-button>
+        <el-button
+          type="primary"
+          icon="el-icon-plus"
+          size="mini"
+          @click="handleAdd"
+          v-hasPermi="['system:menu:add']"
+        >新增</el-button>
       </el-form-item>
     </el-form>
 
@@ -49,16 +55,17 @@
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template slot-scope="scope">
-          <el-button size="mini" 
-            type="text" 
-            icon="el-icon-edit" 
+          <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-edit"
             @click="handleUpdate(scope.row)"
             v-hasPermi="['system:menu:edit']"
           >修改</el-button>
-          <el-button 
-            size="mini" 
-            type="text" 
-            icon="el-icon-plus" 
+          <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-plus"
             @click="handleAdd(scope.row)"
             v-hasPermi="['system:menu:add']"
           >新增</el-button>
@@ -78,7 +85,7 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="上级菜单">
+            <el-form-item label="上级菜单" prop="parentId">
               <treeselect
                 v-model="form.parentId"
                 :options="menuOptions"
@@ -174,7 +181,13 @@
 </template>
 
 <script>
-import { listMenu, getMenu, delMenu, addMenu, updateMenu } from "@/api/system/menu";
+import {
+  listMenu,
+  getMenu,
+  delMenu,
+  addMenu,
+  updateMenu
+} from "@/api/system/menu";
 import Treeselect from "@riophae/vue-treeselect";
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";
 import IconSelect from "@/components/IconSelect";
@@ -205,15 +218,19 @@ export default {
       form: {},
       // 表单校验
       rules: {
+        parentId: [
+          { required: true, message: "上级菜单不能为空", trigger: "blur" }
+        ],
+        menuType: [
+          { required: true, message: "菜单类型不能为空", trigger: "change" }
+        ],
         menuName: [
           { required: true, message: "菜单名称不能为空", trigger: "blur" }
         ],
         orderNum: [
           { required: true, message: "菜单顺序不能为空", trigger: "blur" }
         ],
-        path: [
-          { required: true, message: "路由地址不能为空", trigger: "blur" }
-        ]
+        path: [{ required: true, message: "路由地址不能为空", trigger: "blur" }]
       }
     };
   },
@@ -251,7 +268,7 @@ export default {
     getTreeselect() {
       listMenu().then(response => {
         this.menuOptions = [];
-        const menu = { menuId: 0, menuName: '主类目', children: [] };
+        const menu = { menuId: 0, menuName: "主类目", children: [] };
         menu.children = this.handleTree(response.data, "menuId");
         this.menuOptions.push(menu);
       });
@@ -336,16 +353,23 @@ export default {
     },
     /** 删除按钮操作 */
     handleDelete(row) {
-      this.$confirm('是否确认删除名称为"' + row.menuName + '"的数据项?', "警告", {
+      this.$confirm(
+        '是否确认删除名称为"' + row.menuName + '"的数据项?',
+        "警告",
+        {
           confirmButtonText: "确定",
           cancelButtonText: "取消",
           type: "warning"
-        }).then(function() {
+        }
+      )
+        .then(function() {
           return delMenu(row.menuId);
-        }).then(() => {
+        })
+        .then(() => {
           this.getList();
           this.msgSuccess("删除成功");
-        }).catch(function() {});
+        })
+        .catch(function() {});
     }
   }
 };

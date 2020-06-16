@@ -43,13 +43,23 @@ class DictDataService extends Service {
   }
 
   async modify(params) {
-    const { dictCode, ...rest } = params;
+    // dictType不可修改
+    const { dictCode, dictType, dictValue, dictLabel, ...rest } = params;
     const dict = await this.ctx.model.SysDictData.findByPk(dictCode);
     if (!dict) {
-      return 404;
+      return { code: 500, msg: '该字典数据不存在' };
     }
-    await dict.update(rest);
-    return dict;
+    const exitDictData = await this.ctx.model.SysDictData.findOne({ where: { [Op.or]: [{ dictValue }, { dictLabel }], [Op.and]: [{ dictType }], dictCode: { [Op.ne]: dictCode } } });
+    if (exitDictData) {
+      if (dictLabel === exitDictData.dictLabel) {
+        return { code: 500, msg: '该字典类型已存在相同数据标签' };
+      }
+      if (dictValue === exitDictData.dictValue) {
+        return { code: 500, msg: '该字典类型已存在相同数据键值' };
+      }
+    }
+    await dict.update({ dictValue, dictLabel, ...rest });
+    return { code: 200, msg: '修改成功' };
   }
 
   async destroy(dictCode) {

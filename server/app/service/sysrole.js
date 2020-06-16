@@ -1,7 +1,7 @@
 'use strict';
 
 const Service = require('egg').Service;
-
+const Op = require('sequelize').Op;
 class SysRoleService extends Service {
   async list(query) {
     if (Object.keys(query).length) {
@@ -10,101 +10,99 @@ class SysRoleService extends Service {
       const whereSql = this.ctx.helper.handleLikeWhereData(rest, true);
       const timeRange = this.ctx.helper.handleRangeTime(beginTime, endTime, 'createdAt');
       const result = await this.ctx.model.SysRole.findAndCountAll({
+        order: [[ 'roleSort', 'ASC' ]],
         limit: toInt(pageSize), offset: (toInt(pageNum) - 1) * pageSize, where: { ...timeRange, ...whereSql, delFlag: 0 },
-        include: [{
-          model: this.ctx.model.SysRole,
-          as: 'roles',
-        }],
       });
       result.cur_page = pageNum;
       result.total_page = Math.ceil(result.count / pageSize);
       return result;
     }
-    const result = await this.ctx.model.SysRole.findAll();
+    const result = await this.ctx.model.SysRole.findAll({ order: [[ 'roleSort', 'ASC' ]] });
     return { rows: result, count: result.length };
   }
 
   async show(id) {
-    let data;
-    let roleIds;
-    if (id) {
-      roleIds = [];
-      data = await this.ctx.model.SysRole.findOne({
-        where: { userId: id }, include: [{
-          model: this.ctx.model.SysRole,
-          as: 'roles',
-          through: {
-            attributes: [],
-          },
-        }],
-      });
-      data.roles.forEach(item => {
-        roleIds.push(item.roleId);
-      });
-    }
-    const roles = await this.ctx.model.SysRole.findAll();
-    return { data, roles, roleIds };
+    const data = await this.ctx.model.SysRole.findByPk(id);
+    return { data };
   }
 
   async create(params) {
-    const { loginName, email, phonenumber, password, roleIds, ...rest } = params;
-    const exitLoingName = await this.ctx.model.SysRole.findOne({ where: { loginName } });
-    if (exitLoingName) {
-      return { code: 500, msg: '用户名已存在' };
-    }
-    const exitEmail = await this.ctx.model.SysRole.findOne({ where: { email } });
-    if (exitEmail) {
-      return { code: 500, msg: '邮箱已存在' };
-    }
-    const exitPhonenumber = await this.ctx.model.SysRole.findOne({ where: { phonenumber } });
-    if (exitPhonenumber) {
-      return { code: 500, msg: '用户号码已存在' };
+    const { roleName, roleKey, menuIds, ...rest } = params;
+    const exitRole = await this.ctx.model.SysRole.findOne({ where: { [Op.or]: [{ roleName }, { roleKey }] } });
+    if (exitRole) {
+      if (exitRole.roleName === roleName) {
+        return { code: 500, msg: '角色名称已存在' };
+      }
+      if (exitRole.roleKey === roleKey) {
+        return { code: 500, msg: '权限字符已存在' };
+      }
     }
     const user = await this.ctx.service.redis.get('user');
-    const scretpassword = this.ctx.helper.getMd5Data(password);
-    const newUser = await this.ctx.model.SysRole.create({ ...rest, loginName, email, phonenumber, password: scretpassword, createBy: user.loginName, updateBy: user.loginName });
+    const newRole = await this.ctx.model.SysRole.create({ ...rest, roleName, roleKey, createBy: user.loginName });
     const insetArr = [];
-    roleIds.forEach(id => {
+    menuIds.forEach(id => {
       insetArr.push({
-        userId: newUser.userId,
-        roleId: id,
+        roleId: newRole.roleId,
+        menuId: id,
       });
     });
-    await this.ctx.model.SysRoleRole.bulkCreate(insetArr, { ignoreDuplicates: true });
+    await this.ctx.model.SysRoleMenu.bulkCreate(insetArr, { ignoreDuplicates: true });
     return { code: 200, msg: '添加成功' };
   }
+
   async modify(params) {
-    const { userId, roleIds, ...rest } = params;
-    if (userId === 1) {
+    const { roleId, roleName, roleKey, menuIds, ...rest } = params;
+    if (roleId === 1) {
       return { code: 500, msg: '不允许操作超级管理员' };
     }
-    const user = await this.ctx.model.SysRole.findByPk(userId);
-    if (!user) {
-      return { code: 500, msg: '此用户不存在' };
+    const role = await this.ctx.model.SysRole.findByPk(roleId);
+    if (!role) {
+      return { code: 500, msg: '此角色不存在' };
+    }
+    const exitRole = await this.ctx.model.SysRole.findOne({ where: { [Op.or]: [{ roleName }, { roleKey }], roleId: { [Op.ne]: roleId } } });
+    if (exitRole) {
+      if (exitRole.roleName === roleName) {
+        return { code: 500, msg: '角色名称已存在' };
+      }
+      if (exitRole.roleKey === roleKey) {
+        return { code: 500, msg: '权限字符已存在' };
+      }
     }
     const insetArr = [];
-    roleIds.forEach(id => {
+    menuIds.forEach(id => {
       insetArr.push({
-        userId: user.userId,
-        roleId: id,
+        menuId: id,
+        roleId,
       });
     });
-    if (insetArr.length) {
-      await this.ctx.model.SysRoleRole.destroy({ where: { userId } });
-      await this.ctx.model.SysRoleRole.bulkCreate(insetArr, { updateOnDuplicate: [ 'userId', 'roleId' ] });
+    await this.ctx.model.SysRoleMenu.destroy({ where: { roleId } });
+    await this.ctx.model.SysRoleMenu.bulkCreate(insetArr, { updateOnDuplicate: [ 'menuId', 'roleId' ] });
+    const loginUser = await this.ctx.service.redis.get('user');
+    await role.update({ ...rest, updateBy: loginUser.loginName });
+    return { code: 200, msg: '修改成功' };
+  }
+  async changeStatus(params) {
+    const { roleId, status } = params;
+    if (roleId === 1) {
+      return { code: 500, msg: '不允许操作超级管理员' };
     }
-    await user.update(rest);
+    const role = await this.ctx.model.SysRole.findByPk(roleId);
+    if (!role) {
+      return { code: 500, msg: '此角色不存在' };
+    }
+    await role.update({ status });
     return { code: 200, msg: '修改成功' };
   }
   async destroy(id) {
-    const user = await this.ctx.model.SysRole.findByPk(id);
-    if (!user) {
-      return { code: 500, msg: '此用户不存在' };
-    }
-    if (id === 1) {
+    const toInt = this.ctx.helper.toInt;
+    const role = await this.ctx.model.SysRole.findByPk(id);
+    if (toInt(id) === 1) {
       return { code: 500, msg: '不允许操作超级管理员' };
     }
-    await user.update({ delFlag: 2 });
+    if (!role) {
+      return { code: 500, msg: '此角色不存在' };
+    }
+    await role.update({ delFlag: 2 });
     return { code: 200, msg: '删除成功' };
   }
 }

@@ -7,7 +7,8 @@ const user = {
     name: '',
     avatar: '',
     roles: [],
-    permissions: []
+    permissions: [],
+    maxDataScore: 0,
   },
 
   mutations: {
@@ -25,7 +26,10 @@ const user = {
     },
     SET_PERMISSIONS: (state, permissions) => {
       state.permissions = permissions
-    }
+    },
+    SET_DATASCORE: (state, num) => {
+      state.maxDataScore = num
+    },
   },
 
   actions: {
@@ -58,6 +62,7 @@ const user = {
           } else {
             commit('SET_ROLES', ['ROLE_DEFAULT'])
           }
+          commit('SET_DATASCORE', getMaxDataScore(res.user.roles))
           commit('SET_NAME', user.login_name)
           commit('SET_AVATAR', avatar)
           resolve(res)
@@ -91,6 +96,18 @@ const user = {
       })
     }
   }
+}
+  /**
+* @fun {Function} getMaxDataScore 获取角色列表最大权值
+* @returns {Number} 返回最大权值
+*/
+
+function getMaxDataScore(roles) {
+  const arr = [ 0 ];
+  roles.forEach(item => {
+    arr.push(item.dataScore);
+  });
+  return Math.max(...arr);
 }
 
 export default user

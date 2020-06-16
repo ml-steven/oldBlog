@@ -26,11 +26,11 @@ module.exports = app => {
       allowNull: false,
       field: 'role_sort',
     },
-    dataScope: {
-      type: DataTypes.CHAR(1),
-      allowNull: true,
-      defaultValue: '1',
-      field: 'data_scope',
+    dataScore: {
+      type: DataTypes.INTEGER(4),
+      allowNull: false,
+      defaultValue: '10',
+      field: 'data_score',
     },
     status: {
       type: DataTypes.CHAR(1),
